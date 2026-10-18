@@ -25,3 +25,4 @@ app.use('/api/recovery',recoveryRoutes);
 app.use('/api',(_req,res)=>res.status(404).json({message:'API endpoint not found'}));
 app.use((err,_req,res,_next)=>{if(err.code===11000){const field=Object.keys(err.keyPattern||{})[0]||'value';return res.status(409).json({message:`This ${field} already exists`});}if(err.type==='entity.parse.failed')return res.status(400).json({message:'Invalid JSON body'});if(err.type==='entity.too.large')return res.status(413).json({message:'Request body too large'});console.error(err);res.status(500).json({message:'Internal server error'});});
 export default app;
+import { fileURLToPath } from 'node:url';
