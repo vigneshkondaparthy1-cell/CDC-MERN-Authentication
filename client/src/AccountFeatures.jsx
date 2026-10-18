@@ -399,7 +399,10 @@ export function DownloadQr({user,qrRef}){
  return <><button className="secondary-button" disabled={busy} onClick={download}><Download size={16}/>{busy?'Preparing…':'Download QR'}</button>{error&&<p role="alert" className="notice error">{error}</p>}</>;
 }
 
-export function ImportStudentsModal({api,onClose,onImported}){
+export function ImportStudentsModal({api,onClose,onImported,type="students"}){
+ const student=type==="students",label=student?"students":"faculty";
+ const endpoint="/admin/import-"+(student?"students":"faculty");
+ const headers=student?"name,email,rollNumber,department,contact,password":"name,email,department,contact,password";
  const dialog=useRef(null);
  const [csvText,setCsvText]=useState('');
  const [preview,setPreview]=useState(null);
@@ -410,12 +413,10 @@ export function ImportStudentsModal({api,onClose,onImported}){
  useEffect(()=>{dialog.current.showModal()},[]);
 
  function downloadTemplate(){
-   const template="name,email,rollNumber,department,contact,password\n" +
-     "Ishaan Verma,ishaan.demo@example.com,100091,Computer Science,+91 98765 00091,StudentPass123!\n" +
-     "Ananya Bose,ananya.demo@example.com,100092,Information Technology,+91 98765 00092,StudentPass123!\n";
+   const template=headers+'\n'+(student?'Ishaan Verma,ishaan.demo@example.com,100091,Computer Science,+91 98765 00091,StudentPass123!\n':'Madhav Sethi,madhav.demo@example.com,Computer Science,+91 98765 00093,FacultyPass123!\n');
    const blob=new Blob([template],{type:'text/csv'});
    const url=URL.createObjectURL(blob);
-   const a=document.createElement('a');a.href=url;a.download='CDC-Students-Template.csv';
+   const a=document.createElement('a');a.href=url;a.download=student?'CDC-Students-Template.csv':'CDC-Faculty-Template.csv';
    document.body.appendChild(a);a.click();a.remove();
    setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
@@ -424,7 +425,8 @@ export function ImportStudentsModal({api,onClose,onImported}){
    const file=e.target.files?.[0];
    if(!file)return;
    const reader=new FileReader();
-   reader.onload=evt=>setCsvText(evt.target.result);
+   if(file.size>200000){setError('Choose a CSV up to 200 KB.');return;}
+   reader.onload=evt=>{setCsvText(evt.target.result);setPreview(null);setError('');setSuccess('')};
    reader.readAsText(file);
  }
 
@@ -432,7 +434,7 @@ export function ImportStudentsModal({api,onClose,onImported}){
    if(!csvText.trim()){setError('Please paste CSV data or choose a file.');return;}
    setBusy(true);setError('');setSuccess('');
    try{
-     const res=await api('/admin/import-students',{
+     const res=await api(endpoint,{
        method:'POST',
        body:{csv:csvText,preview:true}
      });
@@ -447,7 +449,7 @@ export function ImportStudentsModal({api,onClose,onImported}){
  async function doImport(){
    setBusy(true);setError('');
    try{
-     const res=await api('/admin/import-students',{
+     const res=await api(endpoint,{
        method:'POST',
        body:{csv:csvText,preview:false}
      });
@@ -465,11 +467,11 @@ export function ImportStudentsModal({api,onClose,onImported}){
      <div className="section-heading">
        <div>
          <p className="eyebrow">BATCH ENROLLMENT</p>
-         <h2>Import students from CSV</h2>
+         <h2>Import {label} from CSV</h2>
        </div>
-       <button className="icon-button" aria-label="Close dialog" onClick={onClose}><X size={20}/></button>
+       <button className="icon-button" aria-label="Close dialog" disabled={busy} onClick={onClose}><X size={20}/></button>
      </div>
-     <p className="subtle">Upload or paste student records with roll numbers and initial passwords.</p>
+     <p className="subtle">Upload or paste {label} records {student?"with six-digit roll numbers and initial passwords":"with initial passwords. Faculty do not need roll numbers"}.</p>
 
      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'12px 0 16px'}}>
        <button type="button" className="text-button" onClick={downloadTemplate} style={{fontSize:'12px'}}>
@@ -492,7 +494,7 @@ export function ImportStudentsModal({api,onClose,onImported}){
              id="csv-input"
              rows={5}
              style={{width:'100%',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',color:'inherit',padding:'10px',fontSize:'12px',fontFamily:'monospace'}}
-             placeholder="name,email,rollNumber,department,contact,password"
+             placeholder={headers}
              value={csvText}
              onChange={e=>{setCsvText(e.target.value);setPreview(null)}}
            />
@@ -504,7 +506,7 @@ export function ImportStudentsModal({api,onClose,onImported}){
            </button>
            {preview?.ready && (
              <button type="button" className="primary-button" style={{flex:1}} disabled={busy} onClick={doImport}>
-               {busy?'Importing…':`Import ${preview.preview.length} students`}
+               {busy?'Importing…':`Import ${preview.preview.length} ${label}`}
              </button>
            )}
          </div>
@@ -529,11 +531,11 @@ export function ImportStudentsModal({api,onClose,onImported}){
                <div style={{maxHeight:'160px',overflowY:'auto',marginTop:'10px',border:'1px solid var(--border)',borderRadius:'8px'}}>
                  <table className="csv-preview-table">
                    <thead>
-                     <tr><th>Name</th><th>Email</th><th>Roll</th><th>Department</th></tr>
+                     <tr><th>Name</th><th>Email</th>{student&&<th>Roll</th>}<th>Department</th></tr>
                    </thead>
                    <tbody>
                      {preview.preview.slice(0, 10).map((r,idx)=>(
-                       <tr key={idx}><td>{r.name}</td><td>{r.email}</td><td>{r.rollNumber}</td><td>{r.department}</td></tr>
+                       <tr key={idx}><td>{r.name}</td><td>{r.email}</td>{student&&<td>{r.rollNumber}</td>}<td>{r.department}</td></tr>
                      ))}
                    </tbody>
                  </table>
