@@ -400,160 +400,200 @@ export function DownloadQr({user,qrRef}){
 }
 
 export function ImportStudentsModal({api,onClose,onImported,type="students"}){
- const student=type==="students",label=student?"students":"faculty";
- const endpoint="/admin/import-"+(student?"students":"faculty");
- const headers=student?"name,email,rollNumber,department,contact,password":"name,email,department,contact,password";
- const dialog=useRef(null);
- const [csvText,setCsvText]=useState('');
- const [preview,setPreview]=useState(null);
- const [busy,setBusy]=useState(false);
- const [error,setError]=useState('');
- const [success,setSuccess]=useState('');
+  const [currentType,setCurrentType]=useState(type==='faculty'?'faculty':'students');
+  const student=currentType==="students",label=student?"students":"faculty";
+  const endpoint="/admin/import-"+(student?"students":"faculty");
+  const headers=student?"name,email,rollNumber,department,contact,password":"name,email,department,contact,password";
+  const dialog=useRef(null);
+  const fileInputRef=useRef(null);
+  const [csvText,setCsvText]=useState('');
+  const [preview,setPreview]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const [success,setSuccess]=useState('');
 
- useEffect(()=>{dialog.current.showModal()},[]);
+  useEffect(()=>{
+    dialog.current?.showModal?.();
+  },[]);
 
- function downloadTemplate(){
-   const template=headers+'\n'+(student?'Ishaan Verma,ishaan.demo@example.com,100091,Computer Science,+91 98765 00091,StudentPass123!\n':'Madhav Sethi,madhav.demo@example.com,Computer Science,+91 98765 00093,FacultyPass123!\n');
-   const blob=new Blob([template],{type:'text/csv'});
-   const url=URL.createObjectURL(blob);
-   const a=document.createElement('a');a.href=url;a.download=student?'CDC-Students-Template.csv':'CDC-Faculty-Template.csv';
-   document.body.appendChild(a);a.click();a.remove();
-   setTimeout(()=>URL.revokeObjectURL(url),1000);
- }
+  useEffect(()=>{
+    if(type){
+      setCurrentType(type==='faculty'?'faculty':'students');
+    }
+  },[type]);
 
- function handleFile(e){
-   const file=e.target.files?.[0];
-   if(!file)return;
-   const reader=new FileReader();
-   if(file.size>200000){setError('Choose a CSV up to 200 KB.');return;}
-   reader.onload=evt=>{setCsvText(evt.target.result);setPreview(null);setError('');setSuccess('')};
-   reader.readAsText(file);
- }
+  function switchType(newType){
+    if(busy||currentType===newType)return;
+    setCurrentType(newType);
+    setCsvText('');
+    setPreview(null);
+    setError('');
+    setSuccess('');
+    if(fileInputRef.current)fileInputRef.current.value='';
+  }
 
- async function runPreview(){
-   if(!csvText.trim()){setError('Please paste CSV data or choose a file.');return;}
-   setBusy(true);setError('');setSuccess('');
-   try{
-     const res=await api(endpoint,{
-       method:'POST',
-       body:{csv:csvText,preview:true}
-     });
-     setPreview(res);
-   }catch(err){
-     setError(err.message);
-   }finally{
-     setBusy(false);
-   }
- }
+  function downloadTemplate(){
+    const template=headers+'\n'+(student?'Ishaan Verma,ishaan.demo@example.com,100091,Computer Science,+91 98765 00091,StudentPass123!\n':'Madhav Sethi,madhav.demo@example.com,Computer Science,+91 98765 00093,FacultyPass123!\n');
+    const blob=new Blob([template],{type:'text/csv'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=student?'CDC-Students-Template.csv':'CDC-Faculty-Template.csv';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
 
- async function doImport(){
-   setBusy(true);setError('');
-   try{
-     const res=await api(endpoint,{
-       method:'POST',
-       body:{csv:csvText,preview:false}
-     });
-     setSuccess(res.message);
-     onImported?.(res.created);
-   }catch(err){
-     setError(err.message);
-   }finally{
-     setBusy(false);
-   }
- }
+  function handleFile(e){
+    const file=e.target.files?.[0];
+    if(!file)return;
+    const reader=new FileReader();
+    if(file.size>200000){setError('Choose a CSV up to 200 KB.');return;}
+    reader.onload=evt=>{setCsvText(evt.target.result);setPreview(null);setError('');setSuccess('')};
+    reader.readAsText(file);
+  }
 
- return (
-   <dialog className="account-dialog" ref={dialog} style={{width:'min(640px,calc(100vw - 32px))'}} onCancel={e=>{e.preventDefault();if(!busy)onClose()}}>
-     <div className="section-heading">
-       <div>
-         <p className="eyebrow">BATCH ENROLLMENT</p>
-         <h2>Import {label} from CSV</h2>
-       </div>
-       <button className="icon-button" aria-label="Close dialog" disabled={busy} onClick={onClose}><X size={20}/></button>
-     </div>
-     <p className="subtle">Upload or paste {label} records {student?"with six-digit roll numbers and initial passwords":"with initial passwords. Faculty do not need roll numbers"}.</p>
+  async function runPreview(){
+    if(!csvText.trim()){setError('Please paste CSV data or choose a file.');return;}
+    setBusy(true);setError('');setSuccess('');
+    try{
+      const res=await api(endpoint,{
+        method:'POST',
+        body:{csv:csvText,preview:true}
+      });
+      setPreview(res);
+    }catch(err){
+      setError(err.message);
+    }finally{
+      setBusy(false);
+    }
+  }
 
-     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'12px 0 16px'}}>
-       <button type="button" className="text-button" onClick={downloadTemplate} style={{fontSize:'12px'}}>
-         <FileSpreadsheet size={15} style={{verticalAlign:'middle',marginRight:'5px'}}/>Download sample CSV template
-       </button>
-       <label className="secondary-button" style={{padding:'6px 12px',fontSize:'11px',cursor:'pointer'}}>
-         <Upload size={14}/> Choose .csv file
-         <input type="file" accept=".csv,text/csv" style={{display:'none'}} onChange={handleFile}/>
-       </label>
-     </div>
+  async function doImport(){
+    setBusy(true);setError('');
+    try{
+      const res=await api(endpoint,{
+        method:'POST',
+        body:{csv:csvText,preview:false}
+      });
+      setSuccess(res.message);
+      onImported?.(res.created,currentType);
+    }catch(err){
+      setError(err.message);
+    }finally{
+      setBusy(false);
+    }
+  }
 
-     {error&&<p role="alert" className="notice error">{error}</p>}
-     {success&&<p role="status" className="notice success">{success}</p>}
+  return (
+    <dialog className="account-dialog" ref={dialog} style={{width:'min(640px,calc(100vw - 32px))'}} onCancel={e=>{e.preventDefault();if(!busy)onClose()}}>
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">BATCH ENROLLMENT</p>
+          <h2>Import {label} from CSV</h2>
+        </div>
+        <button className="icon-button" aria-label="Close dialog" disabled={busy} onClick={onClose}><X size={20}/></button>
+      </div>
 
-     {!success && (
-       <>
-         <div className="form-field">
-           <label htmlFor="csv-input">CSV Data (comma-separated with headers)</label>
-           <textarea
-             id="csv-input"
-             rows={5}
-             style={{width:'100%',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',color:'inherit',padding:'10px',fontSize:'12px',fontFamily:'monospace'}}
-             placeholder={headers}
-             value={csvText}
-             onChange={e=>{setCsvText(e.target.value);setPreview(null)}}
-           />
-         </div>
+      <div className="segmented" style={{margin:'14px 0 10px',display:'inline-flex'}} aria-label="Target role to import">
+        <button
+          type="button"
+          aria-pressed={student}
+          disabled={busy}
+          onClick={()=>switchType('students')}
+        >
+          Students
+        </button>
+        <button
+          type="button"
+          aria-pressed={!student}
+          disabled={busy}
+          onClick={()=>switchType('faculty')}
+        >
+          Faculty
+        </button>
+      </div>
 
-         <div style={{display:'flex',gap:'10px',marginTop:'14px'}}>
-           <button type="button" className="secondary-button" style={{flex:1}} disabled={busy||!csvText.trim()} onClick={runPreview}>
-             {busy?'Checking…':'Verify & preview CSV'}
-           </button>
-           {preview?.ready && (
-             <button type="button" className="primary-button" style={{flex:1}} disabled={busy} onClick={doImport}>
-               {busy?'Importing…':`Import ${preview.preview.length} ${label}`}
-             </button>
-           )}
-         </div>
+      <p className="subtle">Upload or paste {label} records {student?"with six-digit roll numbers and initial passwords":"with initial passwords. Faculty do not need roll numbers"}.</p>
 
-         {preview && (
-           <div style={{marginTop:'18px'}}>
-             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-               <span style={{fontSize:'12px',fontWeight:600}}>
-                 {preview.ready ? `✓ ${preview.preview.length} valid rows ready to import` : `⚠️ ${preview.errors.length} validation errors`}
-               </span>
-             </div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'12px 0 16px',flexWrap:'wrap',gap:'10px'}}>
+        <button type="button" className="text-button" onClick={downloadTemplate} style={{fontSize:'12px'}}>
+          <FileSpreadsheet size={15} style={{verticalAlign:'middle',marginRight:'5px'}}/>Download sample CSV template
+        </button>
+        <label className="secondary-button" style={{padding:'6px 12px',fontSize:'11px',cursor:'pointer'}}>
+          <Upload size={14}/> Choose .csv file
+          <input ref={fileInputRef} type="file" accept=".csv,text/csv" style={{display:'none'}} onChange={handleFile}/>
+        </label>
+      </div>
 
-             {preview.errors?.length > 0 && (
-               <div style={{maxHeight:'120px',overflowY:'auto',background:'rgba(239,68,68,0.1)',borderRadius:'8px',padding:'8px 12px',marginTop:'8px'}}>
-                 {preview.errors.map((e,idx)=>(
-                   <p key={idx} style={{margin:'4px 0',fontSize:'11px',color:'#fda4af'}}>Row {e.row}: {e.message}</p>
-                 ))}
-               </div>
-             )}
+      {error&&<p role="alert" className="notice error">{error}</p>}
+      {success&&<p role="status" className="notice success">{success}</p>}
 
-             {preview.preview?.length > 0 && (
-               <div style={{maxHeight:'160px',overflowY:'auto',marginTop:'10px',border:'1px solid var(--border)',borderRadius:'8px'}}>
-                 <table className="csv-preview-table">
-                   <thead>
-                     <tr><th>Name</th><th>Email</th>{student&&<th>Roll</th>}<th>Department</th></tr>
-                   </thead>
-                   <tbody>
-                     {preview.preview.slice(0, 10).map((r,idx)=>(
-                       <tr key={idx}><td>{r.name}</td><td>{r.email}</td>{student&&<td>{r.rollNumber}</td>}<td>{r.department}</td></tr>
-                     ))}
-                   </tbody>
-                 </table>
-                 {preview.preview.length > 10 && <p className="subtle" style={{textAlign:'center',padding:'4px'}}>...and {preview.preview.length - 10} more rows</p>}
-               </div>
-             )}
-           </div>
-         )}
-       </>
-     )}
+      {!success && (
+        <>
+          <div className="form-field">
+            <label htmlFor="csv-input">CSV Data (comma-separated with headers)</label>
+            <textarea
+              id="csv-input"
+              rows={5}
+              style={{width:'100%',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'10px',color:'inherit',padding:'10px',fontSize:'12px',fontFamily:'monospace'}}
+              placeholder={headers}
+              value={csvText}
+              onChange={e=>{setCsvText(e.target.value);setPreview(null)}}
+            />
+          </div>
 
-     {success && (
-       <div style={{marginTop:'16px'}}>
-         <button className="primary-button" style={{width:'100%'}} onClick={onClose}>Done</button>
-       </div>
-     )}
-   </dialog>
- );
+          <div style={{display:'flex',gap:'10px',marginTop:'14px'}}>
+            <button type="button" className="secondary-button" style={{flex:1}} disabled={busy||!csvText.trim()} onClick={runPreview}>
+              {busy?'Checking…':'Verify & preview CSV'}
+            </button>
+            {preview?.ready && (
+              <button type="button" className="primary-button" style={{flex:1}} disabled={busy} onClick={doImport}>
+                {busy?'Importing…':`Import ${preview.preview.length} ${label}`}
+              </button>
+            )}
+          </div>
+
+          {preview && (
+            <div style={{marginTop:'18px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span style={{fontSize:'12px',fontWeight:600}}>
+                  {preview.ready ? `✓ ${preview.preview.length} valid rows ready to import` : `⚠️ ${preview.errors.length} validation errors`}
+                </span>
+              </div>
+
+              {preview.errors?.length > 0 && (
+                <div style={{maxHeight:'120px',overflowY:'auto',background:'rgba(239,68,68,0.1)',borderRadius:'8px',padding:'8px 12px',marginTop:'8px'}}>
+                  {preview.errors.map((e,idx)=>(
+                    <p key={idx} style={{margin:'4px 0',fontSize:'11px',color:'#fda4af'}}>Row {e.row}: {e.message}</p>
+                  ))}
+                </div>
+              )}
+
+              {preview.preview?.length > 0 && (
+                <div style={{maxHeight:'160px',overflowY:'auto',marginTop:'10px',border:'1px solid var(--border)',borderRadius:'8px'}}>
+                  <table className="csv-preview-table">
+                    <thead>
+                      <tr><th>Name</th><th>Email</th>{student&&<th>Roll</th>}<th>Department</th></tr>
+                    </thead>
+                    <tbody>
+                      {preview.preview.slice(0, 10).map((r,idx)=>(
+                        <tr key={idx}><td>{r.name}</td><td>{r.email}</td>{student&&<td>{r.rollNumber}</td>}<td>{r.department}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {preview.preview.length > 10 && <p className="subtle" style={{textAlign:'center',padding:'4px'}}>...and {preview.preview.length - 10} more rows</p>}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {success && (
+        <div style={{marginTop:'16px'}}>
+          <button className="primary-button" style={{width:'100%'}} onClick={onClose}>Done</button>
+        </div>
+      )}
+    </dialog>
+  );
 }
 
 export function NotificationsPanel({api,user,onClose,onNoticeAdded}){
