@@ -12,6 +12,9 @@ import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import {requireAuth} from './middleware/auth.js';
 const app=express();app.disable('x-powered-by');app.use(helmet());
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 app.use(cors({origin:process.env.CLIENT_ORIGIN||'http://localhost:5173',credentials:true}));
 app.use('/api/auth/login',express.json({limit:'32kb'}));
 app.use(express.json({limit:'2mb'}));app.use(cookieParser());
@@ -23,6 +26,17 @@ app.use('/api/admin',directoryToolsRoutes);
 app.use('/api/campus',campusRoutes);
 app.use('/api/recovery',recoveryRoutes);
 app.use('/api',(_req,res)=>res.status(404).json({message:'API endpoint not found'}));
+if (process.env.NODE_ENV === 'production') {
+  const clientDist = fileURLToPath(
+    new URL('../../client/dist/', import.meta.url)
+  );
+
+  app.use(express.static(clientDist));
+
+  app.get('*', (_req, res) => {
+    res.sendFile(`${clientDist}/index.html`);
+  });
+}
 app.use((err,_req,res,_next)=>{if(err.code===11000){const field=Object.keys(err.keyPattern||{})[0]||'value';return res.status(409).json({message:`This ${field} already exists`});}if(err.type==='entity.parse.failed')return res.status(400).json({message:'Invalid JSON body'});if(err.type==='entity.too.large')return res.status(413).json({message:'Request body too large'});console.error(err);res.status(500).json({message:'Internal server error'});});
 export default app;
 import { fileURLToPath } from 'node:url';
