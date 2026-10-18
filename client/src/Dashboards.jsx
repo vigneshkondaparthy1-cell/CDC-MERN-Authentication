@@ -143,7 +143,7 @@ function Shell({user, logout, children, onSection, api}) {
           <summary>Need a hand?</summary>
           <p>
             {user.role==="admin"
-              ?"Use Faculty or Students to browse accounts, filter by department, download formatted Excel spreadsheets, or import students from CSV."
+              ?"Use Faculty or Students to browse accounts, filter by department, download formatted Excel spreadsheets, or import students and faculty from CSV."
               :"Your administrator manages key account details. You can update your portrait photo, department, and contact info in Profile Settings."}
           </p>
           {user.role==="student"&&<p>Your QR contains only your unique student identifier. Use Copy identifier when you need the code as text.</p>}
@@ -353,11 +353,28 @@ export function AdminDashboard({user,logout,api}) {
         user={user}
         subtitle="Campus control center. Students, faculty, and records at your fingertips."
         action={
-          <div style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
-            <button className="secondary-button" onClick={()=>setImportModal(tab)}>
-              <Upload size={16}/> Import CSV
+          <div style={{display:'flex',gap:'10px',flexWrap:'wrap',alignItems:'center'}}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={()=>setImportModal('students')}
+              title="Import student records from CSV"
+            >
+              <Upload size={16}/> Import Student CSV
             </button>
-            <button className="primary-button" onClick={()=>setModal(tab)}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={()=>setImportModal('faculty')}
+              title="Import faculty records from CSV"
+            >
+              <Upload size={16}/> Import Faculty CSV
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={()=>setModal(tab)}
+            >
               <Plus size={18}/> Add account
             </button>
           </div>
@@ -417,6 +434,23 @@ export function AdminDashboard({user,logout,api}) {
           </div>
 
           <div style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}>
+            {/* CSV Import Buttons */}
+            <button
+              type="button"
+              className="export-button"
+              title="Import students from CSV spreadsheet"
+              onClick={()=>setImportModal('students')}
+            >
+              <Upload size={15}/> Import Student CSV
+            </button>
+            <button
+              type="button"
+              className="export-button"
+              title="Import faculty from CSV spreadsheet"
+              onClick={()=>setImportModal('faculty')}
+            >
+              <Upload size={15}/> Import Faculty CSV
+            </button>
             {/* Excel Download Buttons */}
             <button
               type="button"
@@ -579,10 +613,11 @@ export function AdminDashboard({user,logout,api}) {
           type={importModal}
           api={api}
           onClose={()=>setImportModal(false)}
-          onImported={(count)=>{
+          onImported={(count, importedRole)=>{
+            const role = importedRole || (importModal === 'faculty' ? 'faculty' : 'students');
             setNotice({
-              text:`Successfully imported ${count} ${importModal}.`,
-              role:importModal
+              text:`Successfully imported ${count} ${role}.`,
+              role
             });
             setRevision(v=>v+1);
           }}
