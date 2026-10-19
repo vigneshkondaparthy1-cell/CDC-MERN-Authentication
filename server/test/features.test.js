@@ -149,7 +149,7 @@ test('password recovery: forgot password dispatch and reset with single-use link
 
   // Old password fails, new password works
   await request(app).post('/api/auth/login').send({email:'admin@example.com',password}).expect(401);
-  await request(app).post('/api/auth/login').send({email:'admin@example.com',password:newPass}).expect(200);
+  await admin.post('/api/auth/login').send({email:'admin@example.com',password:newPass}).expect(200);
 
   // Token is single use
   await request(app).post('/api/recovery/reset-password').send({token,password:'AnotherPass123!'}).expect(400);
