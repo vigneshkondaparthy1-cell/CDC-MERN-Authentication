@@ -14,11 +14,13 @@ const userSchema = new mongoose.Schema({
  readNotices:{type:[String],default:[],select:false},
  rollNumber:{type:String,trim:true,match:[/^[0-9]{6}$/, 'Roll number must be exactly 6 digits'],required:function(){return this.role==='student'}},
  studentQrId:{type:String},
+ branch:{type:String,trim:true,maxlength:80,default:''},section:{type:String,trim:true,maxlength:30,default:''},
+ studyYear:{type:String,trim:true,maxlength:40,default:''},validPeriod:{type:String,trim:true,maxlength:30,default:''},
  sessionVersion:{type:Number,default:0,select:false},
  passwordChangedAt:Date,emailChangedAt:Date,
- accountEvents:{type:[new mongoose.Schema({type:{type:String,enum:["email_changed","password_changed","profile_updated_by_admin","password_reset_by_admin"]},at:Date,actorId:mongoose.Schema.Types.ObjectId})],select:false,default:[]}
+ accountEvents:{type:[new mongoose.Schema({type:{type:String,enum:["email_changed","password_changed","profile_updated_by_admin","password_reset_by_admin","profile_updated","status_changed"]},at:Date,actorId:mongoose.Schema.Types.ObjectId,actorName:String,actorRole:String,changes:[{field:String,before:String,after:String}]})],select:false,default:[]}
 },{timestamps:true});
 userSchema.index({rollNumber:1},{unique:true,partialFilterExpression:{rollNumber:{$type:'string'}}});
 userSchema.index({studentQrId:1},{unique:true,partialFilterExpression:{studentQrId:{$type:'string'}}});
-userSchema.set('toJSON',{transform(_doc,ret){delete ret.passwordHash;delete ret.sessionVersion;delete ret.accountEvents;delete ret.__v;return ret;}});
+userSchema.set('toJSON',{transform(_doc,ret){delete ret.passwordHash;delete ret.sessionVersion;delete ret.accountEvents;for(const key of ['resetHash','resetExpires','verifyHash','verifyExpires','readNotices'])delete ret[key];delete ret.__v;return ret;}});
 export default mongoose.model('User',userSchema);
