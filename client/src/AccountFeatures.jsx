@@ -227,6 +227,7 @@ export function AccountSettings({user,api,onUserUpdated}){
 
 export function ManageAccount({person,mode,api,onClose,onSaved}){
  const dialog=useRef(null),[name,setName]=useState(person.name),[email,setEmail]=useState(person.email),[password,setPassword]=useState(''),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
+ const [academic,setAcademic]=useState(Object.fromEntries(['department','branch','section','studyYear','validPeriod'].map(key=>[key,person[key]||''])));
  const reset=mode==='reset';
  useEffect(()=>{dialog.current.showModal()},[]);
 
@@ -235,7 +236,7 @@ export function ManageAccount({person,mode,api,onClose,onSaved}){
    try{
      const result=await api('/admin/accounts/'+person._id+(reset?'/reset-password':''),{
        method:reset?'POST':'PATCH',
-       body:reset?{password,confirm:confirmed}:{name,email}
+       body:reset?{password,confirm:confirmed}:{name,email,...academic}
      });
      setSuccess(result.message);
      onSaved();
@@ -303,6 +304,7 @@ export function ManageAccount({person,mode,api,onClose,onSaved}){
            <>
              <div className="form-field"><label htmlFor="edit-name">Full name</label><input id="edit-name" required minLength={2} maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></div>
              <div className="form-field"><label htmlFor="edit-email">Email</label><input id="edit-email" type="email" required value={email} onChange={e=>setEmail(e.target.value)}/></div>
+             {person.role==='student'&&<div className="settings-grid">{[['department','Department'],['branch','Branch / programme'],['section','Section'],['studyYear','Year of study'],['validPeriod','Valid period']].map(([key,label])=><div className="form-field" key={key}><label htmlFor={'edit-'+key}>{label}</label><input id={'edit-'+key} value={academic[key]} maxLength={key==='department'||key==='branch'?80:key==='studyYear'?40:30} onChange={e=>setAcademic({...academic,[key]:e.target.value})}/></div>)}</div>}
              <p className="subtle">Roll number and QR identity stay unchanged. Changing email signs out existing sessions.</p>
            </>
          )}
@@ -334,7 +336,9 @@ const eventNames={
  email_changed:'Changed their email',
  password_changed:'Changed their password',
  profile_updated_by_admin:'Profile updated by Admin',
- password_reset_by_admin:'Password reset by Admin'
+ password_reset_by_admin:'Password reset by Admin',
+ profile_updated:'Updated their profile',
+ status_changed:'Account status changed'
 };
 
 export function AccountActivity({api,revision}){
@@ -362,7 +366,7 @@ export function AccountActivity({api,revision}){
        <div><p className="eyebrow">ACCOUNT UPDATES</p><h2>Recent activity</h2></div>
        <button className="icon-button" aria-label="Refresh activity" onClick={()=>setRefresh(v=>v+1)}><RefreshCw size={18}/></button>
      </div>
-     <p className="subtle">Email and password changes appear automatically. Passwords are never shown.</p>
+     <p className="subtle">See who changed an account, when, and the previous and new details. Password values are never stored here. Older events may have no field details.</p>
      {error&&<p role="alert" className="notice error">{error}</p>}
      {loading?<p role="status">Loading activity…</p>:!events.length?<p className="empty-state">No account changes yet.</p>:(
        <ul className="activity-list">
@@ -371,6 +375,9 @@ export function AccountActivity({api,revision}){
              <span>
                <strong>{event.name}</strong>
                <span>{eventNames[event.type]||'Account updated'} · {event.email}</span>
+               {event.actorName&&<span>By {event.actorName} ({event.actorRole})</span>}
+               {event.changes?.map((change,index)=><span key={index} className="account-change"><b>{change.field}</b>: {change.before||'Not set'} → {change.after||'Not set'}</span>)}
+               {event.type.includes('password')&&<span>Password changed successfully · value hidden</span>}
              </span>
              <time dateTime={event.at}>{new Date(event.at).toLocaleString()}</time>
            </li>
@@ -1199,4 +1206,11 @@ export function DashboardSummaries({api,user,onOpenNotices,onOpenAttendance}){
      </div>
    </section>
  );
+}
+
+export function DeleteAccount({person,api,onClose,onDeleted}){
+ const dialog=useRef(null),[email,setEmail]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{dialog.current.showModal()},[]);
+ async function submit(e){e.preventDefault();setBusy(true);setError('');try{await api('/admin/accounts/'+person._id,{method:'DELETE',body:{confirmEmail:email}});onDeleted()}catch(e){setError(e.message);setBusy(false)}}
+ return <dialog className="account-dialog" ref={dialog} aria-labelledby="delete-title" onCancel={e=>{e.preventDefault();if(!busy)onClose()}}><div className="section-heading"><h2 id="delete-title">Delete {person.role} account</h2><button className="icon-button" disabled={busy} aria-label="Close delete confirmation" onClick={onClose}><X size={20}/></button></div><div className="delete-account-warning"><strong>{person.name}</strong><p>This permanently removes this login, profile, and its account-update history. Existing sessions stop working. It cannot be undone.</p></div><form onSubmit={submit}><div className="form-field"><label htmlFor="delete-email">Type {person.email} to confirm</label><input id="delete-email" type="email" autoComplete="off" required value={email} disabled={busy} onChange={e=>setEmail(e.target.value)}/></div>{error&&<p role="alert" className="notice error">{error}</p>}<div className="account-actions"><button type="button" className="secondary-button" disabled={busy} onClick={onClose}>Cancel</button><button className="primary-button delete-account-button" disabled={busy||email.trim().toLowerCase()!==person.email}>{busy?'Deleting…':'Permanently delete account'}</button></div></form></dialog>;
 }
