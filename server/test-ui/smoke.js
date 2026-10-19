@@ -64,14 +64,12 @@ try{
  await page.unroute('**/api/auth/logout');
  for(const [tab,name,email] of [['Faculty','Faculty Browser','faculty@example.com'],['Students','Student Browser','student@example.com']]){
   await page.getByRole('button',{name:tab,exact:true}).click();
-  await page.getByRole('button',{name:'Add account',exact:true}).click();
-  await page.evaluate(()=>window.scrollTo(0,0)); await page.screenshot({path:artifactDir+'/account-dialog-light.png',fullPage:true,animations:'disabled'});
-  await page.getByLabel('Full name').fill(name);await page.getByLabel('Email',{exact:true}).fill(email);
-  await page.getByRole('button',{name:'Generate password',exact:true}).click();
-  assert.ok((await page.getByLabel('Initial password',{exact:true}).inputValue()).length>=12);
-  await page.getByLabel('Initial password',{exact:true}).fill(password);
-  if(tab==='Students')await page.getByLabel('Roll number').fill('100002');
-  await page.getByRole('button',{name:'Create account'}).click();
+  await page.getByRole('button',{name:tab==='Students'?'Import Student CSV':'Import Faculty CSV',exact:true}).first().click();
+  const csv=tab==='Students'?'name,email,rollNumber,department,contact,password\n'+name+','+email+',100002,,,'+password:'name,email,department,contact,password\n'+name+','+email+',,,'+password;
+  await page.getByLabel('CSV Data (comma-separated with headers)').fill(csv);
+  await page.getByRole('button',{name:'Verify & preview CSV',exact:true}).click();
+  await page.getByRole('button',{name:tab==='Students'?'Import 1 students':'Import 1 faculty',exact:true}).click();
+  await page.getByRole('button',{name:'Done',exact:true}).click();
   await page.locator('.person-email').filter({hasText:email}).waitFor();
   await page.getByLabel('Search accounts').fill('no-matching-person');
   await page.getByText('No people match your search.').waitFor();
@@ -100,11 +98,11 @@ try{
    await page.getByRole('button',{name:'Switch to dark mode'}).click();
    assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
    await page.getByRole('link',{name:'My profile',exact:true}).click();
-   assert.equal(await page.locator('.qr-frame svg').count(),1);
+   assert.equal(await page.locator('.student-pass-qr').count(),1);
    const downloaded=page.waitForEvent('download');
-   await page.getByRole('button',{name:'Download QR',exact:true}).click();
+   await page.getByRole('button',{name:'Download ID card',exact:true}).click();
    const qrDownload=await downloaded;
-   assert.equal(qrDownload.suggestedFilename(),'CDC-100002-QR.png');
+   assert.equal(qrDownload.suggestedFilename(),'CDC-100002-ID.png');
    await qrDownload.saveAs(artifactDir+'/student-qr.png');
    await page.setViewportSize({width:390,height:844});
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'Mobile page must not overflow horizontally');
