@@ -56,3 +56,24 @@ test('Admin editing preserves identity; password reset needs confirmation and re
  await admin.patch('/api/admin/accounts/'+adminId).send({name:'Change Admin',email:'changed-admin@example.com'}).expect(404);
  await admin.post('/api/admin/accounts/'+adminId+'/reset-password').send({password:'Reset-test-44!',confirm:true}).expect(404);
 });
+
+test('detailed activity records values without credentials; deletion requires Admin and confirmation',async()=>{
+ const result=(await admin.patch('/api/admin/accounts/'+studentId).send({name:'Card Student',email:'card@example.com',branch:'Computer Science',section:'A',studyYear:'3rd year',validPeriod:'2024 – 2028'}).expect(200)).body.user;
+ assert.equal(result.branch,'Computer Science');
+ const events=(await admin.get('/api/admin/activity').expect(200)).body.events;
+ const event=events.find(e=>e.type==='profile_updated_by_admin'&&e.changes?.some(c=>c.after==='card@example.com'));
+ assert.ok(event);assert.equal(event.actorRole,'admin');assert.ok(event.changes.some(c=>c.field==='email'&&c.before==='edited@example.com'));
+ assert.ok(!JSON.stringify(events).includes('Reset-test-44!'));
+ const fresh=request.agent(app);await fresh.post('/api/auth/login').send({email:'card@example.com',password:'Reset-test-44!'}).expect(200);
+ await request(app).delete('/api/admin/accounts/'+studentId).send({confirmEmail:'card@example.com'}).expect(401);
+ await fresh.delete('/api/admin/accounts/'+studentId).send({confirmEmail:'card@example.com'}).expect(403);
+ await admin.delete('/api/admin/accounts/'+studentId).send({confirmEmail:'wrong@example.com'}).expect(400);
+ await admin.delete('/api/admin/accounts/'+adminId).send({confirmEmail:'admin@example.com'}).expect(404);
+ await admin.delete('/api/admin/accounts/'+studentId).send({confirmEmail:'card@example.com'}).expect(200);
+ await fresh.get('/api/auth/me').expect(401);
+ assert.equal(await User.findById(studentId),null);
+ assert.ok(!(await admin.get('/api/admin/students')).body.users.some(u=>u._id===studentId));
+ const f=await User.findOne({role:'faculty'});
+ await admin.delete('/api/admin/accounts/'+f._id).send({confirmEmail:f.email}).expect(200);
+ assert.equal(await User.findById(f._id),null);
+});
