@@ -12,7 +12,9 @@ const router=Router();router.use(requireAuth,adminOnly);
 const wrap=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);
 router.patch('/accounts/:id/status',wrap(async(req,res)=>{
  if(!mongoose.isObjectIdOrHexString(req.params.id)||typeof req.body.active!=='boolean')return res.status(400).json({message:'Choose a valid account and status'});
- const user=await User.findOneAndUpdate({_id:req.params.id,role:{$in:['student','faculty']}},{$set:{active:req.body.active},$inc:{sessionVersion:1},$unset:{resetHash:1,resetExpires:1,verifyHash:1,verifyExpires:1}},{new:true});
+ const current=await User.findOne({_id:req.params.id,role:{$in:['student','faculty']}});
+ if(!current)return res.status(404).json({message:'Account not found'});
+ const user=await User.findOneAndUpdate({_id:current._id,updatedAt:current.updatedAt},{$set:{active:req.body.active},$inc:{sessionVersion:1},$push:{accountEvents:{$each:[{type:'status_changed',at:new Date(),actorId:req.user._id,actorName:req.user.name,actorRole:req.user.role,changes:[{field:'status',before:current.active===false?'Inactive':'Active',after:req.body.active?'Active':'Inactive'}]}],$slice:-20}},$unset:{resetHash:1,resetExpires:1,verifyHash:1,verifyExpires:1}},{new:true});
  if(!user)return res.status(404).json({message:'Account not found'});
  await accountNotice(user,req.body.active?'Account reactivated':'Account deactivated');res.json({user});
 }));
